@@ -22,8 +22,8 @@ def parse_today(schedule_dir: Optional[Path] = None) -> dict:
         return {"date": today, "sections": [], "total": 0, "done_count": 0}
 
     content = filepath.read_text(encoding="utf-8")
-    sections: list[dict] = []
-    current_section: dict | None = None
+    sections: list = []
+    current_section: Optional[dict] = None
 
     for line in content.splitlines():
         if line.startswith("## "):
