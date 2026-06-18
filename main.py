@@ -2,14 +2,14 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import date as _date
-from typing import Union, Optional
+from typing import Optional
 
 from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.events import EVENT_JOB_ERROR
 
 from agent import agent
-from notify import send_wechat_message
+from notify import send_email, send_wechat_message
 from tools import SCHEDULE_DIR as _DEFAULT_SCHEDULE_DIR
 
 
@@ -57,10 +57,15 @@ async def morning_review_job() -> None:
         })
         advice_text = result["messages"][-1].content
 
-        try:
-            await send_wechat_message(advice_text)
-        except Exception as e:
-            print(f"Server酱推送失败: {e}")
+        results = await asyncio.gather(
+            send_email(advice_text),
+            send_wechat_message(advice_text),
+            return_exceptions=True,
+        )
+        names = ["邮件", "Server酱"]
+        for name, res in zip(names, results):
+            if isinstance(res, Exception):
+                print(f"{name}推送失败: {res}")
 
     except Exception as e:
         print(f"morning_review_job 执行失败: {e}")
