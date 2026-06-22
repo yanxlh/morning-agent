@@ -117,3 +117,48 @@ def test_write_task_done_two_sections(tmp_path):
     assert "- [x] 阅读论文" in content
     assert "- 写报告" in content or "- [ ] 写报告" in content
     assert result["done_count"] == 1
+
+
+def test_get_today_api(tmp_path):
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text(
+        "## 固定日程\n- 09:00-10:00 会议\n",
+        encoding="utf-8"
+    )
+
+    with patch("main._DEFAULT_SCHEDULE_DIR", tmp_path), \
+         patch("main.scheduler"):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.get("/api/today")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["date"] == today
+    assert data["total"] == 1
+    assert data["sections"][0]["tasks"][0]["id"] == "s0-t0"
+
+
+def test_patch_task_api(tmp_path):
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text(
+        "## 灵活待办\n- 找项目\n",
+        encoding="utf-8"
+    )
+
+    with patch("main._DEFAULT_SCHEDULE_DIR", tmp_path), \
+         patch("main.scheduler"):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.patch("/api/task/s0-t0", json={"done": True})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sections"][0]["tasks"][0]["done"] is True
+    assert data["done_count"] == 1

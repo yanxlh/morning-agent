@@ -5,6 +5,8 @@ from datetime import date as _date
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.events import EVENT_JOB_ERROR
 
@@ -118,6 +120,27 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+_BASE_DIR = Path(__file__).parent
+
+
+@app.get("/")
+async def index():
+    return FileResponse(_BASE_DIR / "static" / "index.html")
+
+
+@app.get("/api/today")
+async def get_today():
+    return parse_today()
+
+
+class _TaskUpdate(BaseModel):
+    done: bool
+
+
+@app.patch("/api/task/{task_id}")
+async def update_task(task_id: str, body: _TaskUpdate):
+    return write_task_done(task_id, body.done)
 
 
 @app.post("/trigger-review")
