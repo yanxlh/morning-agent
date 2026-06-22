@@ -1,6 +1,6 @@
 # 早晨日程规划 Agent
 
-每天早上 7:00 自动读取你的日程文件，调用 AI 生成排期建议，通过微信（Server酱）推送到手机。
+每天早上 7:00 自动读取你的日程文件，调用 AI 生成排期建议，通过微信（Server酱）推送到手机。同时提供一个网页，随时查看今日任务和完成进度。
 
 ---
 
@@ -12,6 +12,11 @@
   → GLM-4-Flash 分析固定日程 + 灵活待办，生成排期建议
   → 顺手创建明天的日程模板文件
   → 微信推送给你
+
+浏览器打开 http://localhost:8000
+  → 展示今日任务列表
+  → 勾选完成进度（实时进度条）
+  → 完成状态写回日程文件
 ```
 
 ---
@@ -22,10 +27,12 @@
 morning-agent/
 ├── .env                # 你的 API Key（不提交 git）
 ├── .env.example        # 配置模板，含注册说明
-├── main.py             # 启动入口，定时任务
+├── main.py             # 启动入口，定时任务 + API 路由
 ├── agent.py            # AI Agent 逻辑
 ├── tools.py            # 读日程、建明日模板
 ├── notify.py           # Server酱微信推送
+├── static/
+│   └── index.html      # 今日进度前端页面
 └── schedule/           # 日程文件目录
     ├── 2026-06-18.md   # 今天的日程（早上被读取）
     └── 2026-06-19.md   # Agent 自动生成的明天模板
@@ -57,10 +64,12 @@ morning-agent/
 
 ## 配置说明（.env）
 
+复制 `.env.example` 为 `.env`，填入你的 Key：
+
 ```bash
 ZHIPUAI_API_KEY=xxx    # 智谱 AI Key，免费：https://open.bigmodel.cn
-GMAIL_ADDRESS=xxx      # 预留字段，当前未使用
-SMTP_PASSWORD=xxx      # 预留字段，当前未使用
+GMAIL_ADDRESS=xxx      # Gmail 地址（发件人和收件人均为此地址）
+SMTP_PASSWORD=xxx      # Gmail 应用专用密码
 SERVERCHAN_KEY=xxx     # Server酱 Key，免费：https://sct.ftqq.com
 ```
 
@@ -76,16 +85,26 @@ SERVERCHAN_KEY=xxx     # Server酱 Key，免费：https://sct.ftqq.com
 
 ---
 
+## 安装依赖
+
+```bash
+pip3 install -r requirements.txt
+```
+
+---
+
 ## 启动方式
 
 ```bash
-cd /Users/yxlh/Documents/morning-agent
+cd /path/to/morning-agent
 python3 -m uvicorn main:app --reload
 ```
 
-启动后 Agent 会在每天早上 7:00 自动运行，进程保持运行即可。
+启动后：
+- Agent 每天早上 7:00 自动运行，微信推送排期建议
+- 浏览器打开 `http://localhost:8000` 查看今日任务进度
 
-**手动触发（调试用）：**
+**手动触发 AI 排期（调试用）：**
 
 ```bash
 curl -X POST http://localhost:8000/trigger-review
@@ -93,11 +112,34 @@ curl -X POST http://localhost:8000/trigger-review
 
 ---
 
+## 前端进度页面
+
+打开 `http://localhost:8000`，页面展示今日所有任务，支持勾选完成：
+
+- 顶部整体进度条（已完成 / 总数）
+- 每个分组（固定日程 / 灵活待办）各有一条进度条
+- 点击任务勾选，进度条实时更新
+- 完成状态写回日程文件（`- [x] 任务名`）
+- 刷新页面后状态保持
+
+---
+
+## API 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/` | 前端进度页面 |
+| GET | `/api/today` | 获取今日任务 JSON |
+| PATCH | `/api/task/{id}` | 更新任务完成状态 |
+| POST | `/trigger-review` | 手动触发 AI 排期 |
+
+---
+
 ## 日常使用流程
 
 1. **每晚**：打开 `schedule/明日日期.md`（Agent 已自动创建），填写明天的固定日程和灵活待办
 2. **每早 7:00**：微信收到今日排期建议
-3. **按建议执行**，随时可手动触发调整
+3. **打开浏览器** `http://localhost:8000`：查看任务列表，完成一项勾一项
 
 ---
 
