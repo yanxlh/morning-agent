@@ -47,6 +47,39 @@ def parse_today(schedule_dir: Optional[Path] = None) -> dict:
     done_count = sum(t["done"] for s in sections for t in s["tasks"])
     return {"date": today, "sections": sections, "total": total, "done_count": done_count}
 
+
+def write_task_done(task_id: str, done: bool, schedule_dir: Optional[Path] = None) -> dict:
+    directory = schedule_dir if schedule_dir is not None else _DEFAULT_SCHEDULE_DIR
+    today = _date.today().isoformat()
+    filepath = directory / f"{today}.md"
+
+    parts = task_id.split("-")
+    target_si, target_ti = int(parts[0][1:]), int(parts[1][1:])
+
+    lines = filepath.read_text(encoding="utf-8").splitlines(keepends=True)
+    current_si, current_ti = -1, -1
+
+    for i, line in enumerate(lines):
+        if line.startswith("## "):
+            current_si += 1
+            current_ti = -1
+        elif line.startswith("- ") and current_si >= 0:
+            raw = line[2:].strip()
+            if not raw or raw == "-":
+                continue
+            current_ti += 1
+            if current_si == target_si and current_ti == target_ti:
+                if raw.startswith("[x] ") or raw.startswith("[ ] "):
+                    text = raw[4:]
+                else:
+                    text = raw
+                marker = "[x]" if done else "[ ]"
+                lines[i] = f"- {marker} {text}\n"
+                break
+
+    filepath.write_text("".join(lines), encoding="utf-8")
+    return parse_today(schedule_dir=directory)
+
 scheduler = AsyncIOScheduler()
 
 
