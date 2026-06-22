@@ -84,6 +84,7 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({done: !currentDone})
       });
+      if (!res.ok) return;
       _data = await res.json();
       render(_data);
     }

@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import date as _date
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -55,11 +55,18 @@ def write_task_done(task_id: str, done: bool, schedule_dir: Optional[Path] = Non
     today = _date.today().isoformat()
     filepath = directory / f"{today}.md"
 
-    parts = task_id.split("-")
-    target_si, target_ti = int(parts[0][1:]), int(parts[1][1:])
+    if not filepath.exists():
+        return parse_today(schedule_dir=directory)
+
+    try:
+        parts = task_id.split("-")
+        target_si, target_ti = int(parts[0][1:]), int(parts[1][1:])
+    except (IndexError, ValueError):
+        raise HTTPException(status_code=400, detail="invalid task_id format")
 
     lines = filepath.read_text(encoding="utf-8").splitlines(keepends=True)
     current_si, current_ti = -1, -1
+    found = False
 
     for i, line in enumerate(lines):
         if line.startswith("## "):
@@ -77,7 +84,11 @@ def write_task_done(task_id: str, done: bool, schedule_dir: Optional[Path] = Non
                     text = raw
                 marker = "[x]" if done else "[ ]"
                 lines[i] = f"- {marker} {text}\n"
+                found = True
                 break
+
+    if not found:
+        raise HTTPException(status_code=404, detail="task not found")
 
     filepath.write_text("".join(lines), encoding="utf-8")
     return parse_today(schedule_dir=directory)
