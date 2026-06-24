@@ -12,16 +12,21 @@ from apscheduler.events import EVENT_JOB_ERROR
 
 from agent import agent
 from notify import send_email, send_wechat_message
-from tools import SCHEDULE_DIR as _DEFAULT_SCHEDULE_DIR
+from tools import (
+    SCHEDULE_DIR as _DEFAULT_SCHEDULE_DIR,
+    create_schedule,
+    append_task,
+    delete_task,
+    update_task_text,
+)
 
 
-def parse_today(schedule_dir: Optional[Path] = None) -> dict:
+def parse_schedule(date_str: str, schedule_dir: Optional[Path] = None) -> dict:
     directory = schedule_dir if schedule_dir is not None else _DEFAULT_SCHEDULE_DIR
-    today = _date.today().isoformat()
-    filepath = directory / f"{today}.md"
+    filepath = directory / f"{date_str}.md"
 
     if not filepath.exists():
-        return {"date": today, "sections": [], "total": 0, "done_count": 0}
+        return {"date": date_str, "sections": [], "total": 0, "done_count": 0}
 
     content = filepath.read_text(encoding="utf-8")
     sections: list = []
@@ -47,16 +52,25 @@ def parse_today(schedule_dir: Optional[Path] = None) -> dict:
 
     total = sum(len(s["tasks"]) for s in sections)
     done_count = sum(t["done"] for s in sections for t in s["tasks"])
-    return {"date": today, "sections": sections, "total": total, "done_count": done_count}
+    return {"date": date_str, "sections": sections, "total": total, "done_count": done_count}
 
 
-def write_task_done(task_id: str, done: bool, schedule_dir: Optional[Path] = None) -> dict:
+def parse_today(schedule_dir: Optional[Path] = None) -> dict:
+    return parse_schedule(_date.today().isoformat(), schedule_dir=schedule_dir)
+
+
+def write_task_done(
+    task_id: str,
+    done: bool,
+    date_str: Optional[str] = None,
+    schedule_dir: Optional[Path] = None,
+) -> dict:
     directory = schedule_dir if schedule_dir is not None else _DEFAULT_SCHEDULE_DIR
-    today = _date.today().isoformat()
-    filepath = directory / f"{today}.md"
+    resolved_date = date_str if date_str is not None else _date.today().isoformat()
+    filepath = directory / f"{resolved_date}.md"
 
     if not filepath.exists():
-        return parse_today(schedule_dir=directory)
+        return parse_schedule(resolved_date, schedule_dir=directory)
 
     try:
         parts = task_id.split("-")
@@ -91,7 +105,8 @@ def write_task_done(task_id: str, done: bool, schedule_dir: Optional[Path] = Non
         raise HTTPException(status_code=404, detail="task not found")
 
     filepath.write_text("".join(lines), encoding="utf-8")
-    return parse_today(schedule_dir=directory)
+    return parse_schedule(resolved_date, schedule_dir=directory)
+
 
 scheduler = AsyncIOScheduler()
 
@@ -126,6 +141,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(morning_review_job, "cron", hour=7, minute=0, id="morning_review")
     scheduler.add_listener(job_error_listener, EVENT_JOB_ERROR)
     scheduler.start()
+    asyncio.create_task(morning_review_job())
     yield
     scheduler.shutdown()
 
@@ -150,12 +166,71 @@ class _TaskUpdate(BaseModel):
 
 
 @app.patch("/api/task/{task_id}")
-async def update_task(task_id: str, body: _TaskUpdate):
+async def update_task_legacy(task_id: str, body: _TaskUpdate):
     return write_task_done(task_id, body.done)
 
 
 @app.post("/trigger-review")
 async def trigger_review_manually():
-    """手动触发一次日程规划，方便调试"""
     await morning_review_job()
     return {"status": "ok"}
+
+
+# ── 新增端点 ──────────────────────────────────────────────────────
+
+@app.get("/api/schedule/{date_str}")
+async def get_schedule(date_str: str):
+    return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+
+
+@app.post("/api/schedule/{date_str}")
+async def create_day(date_str: str):
+    create_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+    return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+
+
+class _TaskCreate(BaseModel):
+    section: str
+    text: str
+
+
+@app.post("/api/schedule/{date_str}/task")
+async def add_task(date_str: str, body: _TaskCreate):
+    try:
+        append_task(date_str, body.section, body.text, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="schedule file not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+
+
+class _TaskEdit(BaseModel):
+    done: Optional[bool] = None
+    text: Optional[str] = None
+
+
+@app.patch("/api/schedule/{date_str}/task/{task_id}")
+async def update_task(date_str: str, task_id: str, body: _TaskEdit):
+    if body.done is not None:
+        return write_task_done(task_id, body.done, date_str=date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+    if body.text is not None:
+        try:
+            update_task_text(date_str, task_id, body.text, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+        except (FileNotFoundError, LookupError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+    raise HTTPException(status_code=400, detail="must provide done or text")
+
+
+@app.delete("/api/schedule/{date_str}/task/{task_id}")
+async def remove_task(date_str: str, task_id: str):
+    try:
+        delete_task(date_str, task_id, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+    except (FileNotFoundError, LookupError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
