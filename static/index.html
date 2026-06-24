@@ -11,97 +11,241 @@
       background: #f5f5f5; color: #333; padding: 24px;
       max-width: 600px; margin: 0 auto;
     }
-    .date-header { margin-bottom: 16px; }
+    .date-header { margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     .date-header h1 { font-size: 1.4rem; color: #222; }
-    .date-header p { font-size: 0.85rem; color: #999; margin-top: 2px; }
+    .date-picker {
+      padding: 4px 10px; border: 1px solid #ddd; border-radius: 8px;
+      font-size: 0.9rem; color: #555; background: white; cursor: pointer;
+    }
     .card {
       background: white; border-radius: 12px; padding: 20px;
       margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-    .card-header {
-      display: flex; justify-content: space-between;
-      align-items: center; margin-bottom: 10px;
-    }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .card-title { font-size: 1rem; font-weight: 600; color: #333; }
     .count-label { font-size: 0.85rem; color: #999; }
     .bar-wrap { height: 10px; background: #ebebeb; border-radius: 5px; overflow: hidden; }
-    .bar-fill {
-      height: 100%; border-radius: 5px;
-      background: #5b8def; transition: width 0.3s ease;
-    }
-    .bar-fill.overall { background: #5b8def; }
+    .bar-fill { height: 100%; border-radius: 5px; background: #5b8def; transition: width 0.3s ease; }
     .bar-fill.complete { background: #52c47a; }
-    .done-msg {
-      text-align: center; padding-top: 8px;
-      font-size: 0.9rem; color: #52c47a; font-weight: 500;
-    }
+    .done-msg { text-align: center; padding-top: 8px; font-size: 0.9rem; color: #52c47a; font-weight: 500; }
     .section-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
     .section-title { font-size: 0.95rem; font-weight: 600; color: #444; }
+    .section-header-right { display: flex; align-items: center; gap: 12px; }
     .mini-progress { display: flex; align-items: center; gap: 8px; }
     .mini-bar { width: 72px; height: 6px; background: #ebebeb; border-radius: 3px; overflow: hidden; }
     .mini-fill { height: 100%; border-radius: 3px; background: #5b8def; transition: width 0.3s ease; }
     .mini-count { font-size: 0.78rem; color: #bbb; }
+    .btn-add-task {
+      background: none; border: 1px solid #5b8def; color: #5b8def;
+      border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 0.8rem;
+    }
+    .btn-add-task:hover { background: #f0f5ff; }
     .task-list { list-style: none; }
     .task-item {
       display: flex; align-items: flex-start; gap: 10px;
-      padding: 9px 6px; border-radius: 6px; cursor: pointer;
-      transition: background 0.1s;
+      padding: 9px 6px; border-radius: 6px;
+      transition: background 0.1s; position: relative;
     }
     .task-item:hover { background: #f7f7f7; }
     .task-item + .task-item { border-top: 1px solid #f2f2f2; }
+    .task-item.clickable { cursor: pointer; }
     .checkbox {
       width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 4px;
       flex-shrink: 0; margin-top: 1px; display: flex; align-items: center;
       justify-content: center; transition: all 0.15s; font-size: 11px; color: white;
     }
     .checkbox.checked { background: #52c47a; border-color: #52c47a; }
-    .task-text { font-size: 0.9rem; line-height: 1.45; color: #333; }
+    .task-text { font-size: 0.9rem; line-height: 1.45; color: #333; flex: 1; }
     .task-text.done { text-decoration: line-through; color: #bbb; }
+    .task-actions { display: none; margin-left: auto; gap: 2px; align-items: center; flex-shrink: 0; }
+    .task-item:hover .task-actions { display: flex; }
+    .task-item.editing .task-actions { display: flex; }
+    .btn-icon {
+      background: none; border: none; cursor: pointer;
+      padding: 3px 5px; border-radius: 4px; font-size: 0.85rem; color: #bbb;
+      line-height: 1;
+    }
+    .btn-icon.edit:hover { color: #5b8def; background: #f0f5ff; }
+    .btn-icon.delete:hover { color: #ff4d4f; background: #fff1f0; }
+    .btn-icon.save { color: #52c47a; }
+    .btn-icon.save:hover { background: #f6ffed; }
+    .btn-icon.cancel:hover { color: #999; background: #f5f5f5; }
+    .task-edit-input {
+      flex: 1; border: 1px solid #5b8def; border-radius: 4px;
+      padding: 2px 6px; font-size: 0.9rem; outline: none; min-width: 0;
+    }
+    .add-form {
+      display: flex; gap: 8px; padding: 10px 6px 4px;
+      border-top: 1px solid #f2f2f2; align-items: center;
+    }
+    .add-input {
+      flex: 1; border: 1px solid #ddd; border-radius: 6px;
+      padding: 6px 10px; font-size: 0.9rem; outline: none; min-width: 0;
+    }
+    .add-input:focus { border-color: #5b8def; }
+    .btn-confirm {
+      background: #5b8def; color: white; border: none;
+      border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem; white-space: nowrap;
+    }
+    .btn-cancel-add {
+      background: none; border: 1px solid #ddd; border-radius: 6px;
+      padding: 6px 10px; cursor: pointer; font-size: 0.85rem; color: #999; white-space: nowrap;
+    }
     .empty { text-align: center; color: #ccc; padding: 48px 20px; font-size: 0.9rem; line-height: 1.7; }
+    .create-btn {
+      background: #5b8def; color: white; border: none; border-radius: 8px;
+      padding: 10px 24px; cursor: pointer; font-size: 0.95rem; margin-top: 16px;
+    }
+    .create-btn:hover { background: #4a7de0; }
   </style>
 </head>
 <body>
   <div class="date-header">
     <h1 id="date-title">—</h1>
-    <p id="weekday"></p>
+    <input type="date" id="date-picker" class="date-picker">
   </div>
   <div id="app"><div class="empty">加载中…</div></div>
 
   <script>
     const WEEKDAYS = ['周日','周一','周二','周三','周四','周五','周六'];
     let _data = null;
+    let _currentDate = new Date().toISOString().slice(0, 10);
+    let _editing = null;      // {taskId}
+    let _addingSection = null; // section name
+
+    // ── 初始化 ──────────────────────────────────────────────────
+
+    const picker = document.getElementById('date-picker');
+    picker.value = _currentDate;
+    picker.addEventListener('change', e => {
+      _currentDate = e.target.value;
+      _editing = null;
+      _addingSection = null;
+      load();
+    });
+
+    // ── 数据加载 ─────────────────────────────────────────────────
 
     async function load() {
-      const res = await fetch('/api/today');
+      const res = await fetch('/api/schedule/' + _currentDate);
       _data = await res.json();
       render(_data);
     }
 
+    // ── 操作函数 ─────────────────────────────────────────────────
+
+    async function createSchedule() {
+      await fetch('/api/schedule/' + _currentDate, { method: 'POST' });
+      load();
+    }
+
     async function toggle(taskId, currentDone) {
-      const res = await fetch('/api/task/' + taskId, {
+      const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
         method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({done: !currentDone})
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ done: !currentDone }),
       });
       if (!res.ok) return;
       _data = await res.json();
       render(_data);
     }
 
-    function bar(pct, extraClass) {
-      return `<div class="bar-wrap"><div class="bar-fill ${extraClass}" style="width:${pct}%"></div></div>`;
+    function startEdit(taskId) {
+      _editing = { taskId };
+      _addingSection = null;
+      render(_data);
+      setTimeout(() => {
+        const el = document.getElementById('edit-input-' + taskId);
+        if (el) { el.focus(); el.select(); }
+      }, 30);
+    }
+
+    function cancelEdit() {
+      _editing = null;
+      render(_data);
+    }
+
+    async function saveEdit(taskId) {
+      const el = document.getElementById('edit-input-' + taskId);
+      const text = el ? el.value.trim() : '';
+      if (!text) { cancelEdit(); return; }
+      const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return;
+      _data = await res.json();
+      _editing = null;
+      render(_data);
+    }
+
+    async function deleteTask(taskId) {
+      const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
+        method: 'DELETE',
+      });
+      if (!res.ok) return;
+      _data = await res.json();
+      render(_data);
+    }
+
+    function showAddForm(sectionName) {
+      _addingSection = sectionName;
+      _editing = null;
+      render(_data);
+      setTimeout(() => {
+        const el = document.getElementById('add-input-' + encSec(sectionName));
+        if (el) el.focus();
+      }, 30);
+    }
+
+    function cancelAdd() {
+      _addingSection = null;
+      render(_data);
+    }
+
+    async function confirmAdd(sectionName) {
+      const el = document.getElementById('add-input-' + encSec(sectionName));
+      const text = el ? el.value.trim() : '';
+      if (!text) { cancelAdd(); return; }
+      const res = await fetch('/api/schedule/' + _currentDate + '/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: sectionName, text }),
+      });
+      if (!res.ok) return;
+      _data = await res.json();
+      _addingSection = null;
+      render(_data);
+    }
+
+    function encSec(name) { return name.replace(/\s+/g, '_'); }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── 渲染 ─────────────────────────────────────────────────────
+
+    function bar(pct, extra) {
+      return `<div class="bar-wrap"><div class="bar-fill ${extra}" style="width:${pct}%"></div></div>`;
     }
 
     function render(data) {
       const d = new Date(data.date + 'T12:00:00');
-      document.getElementById('date-title').textContent = data.date;
-      document.getElementById('weekday').textContent = WEEKDAYS[d.getDay()];
+      document.getElementById('date-title').textContent = data.date + ' ' + WEEKDAYS[d.getDay()];
 
       const app = document.getElementById('app');
 
       if (!data.sections || data.sections.length === 0) {
-        app.innerHTML = `<div class="empty">今天还没有日程文件<br>请在 schedule/${data.date}.md 中填写</div>`;
+        app.innerHTML = `<div class="empty">这天还没有日程文件<br>
+          <button class="create-btn" onclick="createSchedule()">创建日程</button>
+        </div>`;
         return;
       }
 
@@ -113,7 +257,7 @@
           <span class="card-title">今日进度</span>
           <span class="count-label">${data.done_count} / ${data.total} 完成</span>
         </div>
-        ${bar(pct, allDone ? 'overall complete' : 'overall')}
+        ${bar(pct, allDone ? 'complete' : '')}
         ${allDone ? '<div class="done-msg">今天的事都做完了 🎉</div>' : ''}
       </div>`;
 
@@ -124,24 +268,55 @@
 
         html += `<div class="section-card">
           <div class="section-header">
-            <span class="section-title">${section.name}</span>
-            <div class="mini-progress">
-              <div class="mini-bar"><div class="mini-fill" style="width:${sp}%"></div></div>
-              <span class="mini-count">${sd}/${st}</span>
+            <span class="section-title">${esc(section.name)}</span>
+            <div class="section-header-right">
+              <div class="mini-progress">
+                <div class="mini-bar"><div class="mini-fill" style="width:${sp}%"></div></div>
+                <span class="mini-count">${sd}/${st}</span>
+              </div>
+              <button class="btn-add-task" onclick="showAddForm('${esc(section.name)}')">+ 添加</button>
             </div>
           </div>
           <ul class="task-list">`;
 
         for (const task of section.tasks) {
-          html += `<li class="task-item" onclick="toggle('${task.id}',${task.done})">
-            <div class="checkbox${task.done ? ' checked' : ''}">
-              ${task.done ? '✓' : ''}
-            </div>
-            <span class="task-text${task.done ? ' done' : ''}">${task.text}</span>
-          </li>`;
+          const isEditing = _editing && _editing.taskId === task.id;
+
+          if (isEditing) {
+            html += `<li class="task-item editing">
+              <div class="checkbox${task.done ? ' checked' : ''}">${task.done ? '✓' : ''}</div>
+              <input id="edit-input-${task.id}" class="task-edit-input" value="${esc(task.text)}"
+                onkeydown="if(event.key==='Enter')saveEdit('${task.id}');if(event.key==='Escape')cancelEdit()">
+              <div class="task-actions">
+                <button class="btn-icon save" onclick="saveEdit('${task.id}')" title="保存">✓</button>
+                <button class="btn-icon cancel" onclick="cancelEdit()" title="取消">✕</button>
+              </div>
+            </li>`;
+          } else {
+            html += `<li class="task-item clickable" onclick="toggle('${task.id}',${task.done})">
+              <div class="checkbox${task.done ? ' checked' : ''}">${task.done ? '✓' : ''}</div>
+              <span class="task-text${task.done ? ' done' : ''}">${esc(task.text)}</span>
+              <div class="task-actions">
+                <button class="btn-icon edit" onclick="event.stopPropagation();startEdit('${task.id}')" title="编辑">✎</button>
+                <button class="btn-icon delete" onclick="event.stopPropagation();deleteTask('${task.id}')" title="删除">×</button>
+              </div>
+            </li>`;
+          }
         }
 
-        html += `</ul></div>`;
+        html += `</ul>`;
+
+        if (_addingSection === section.name) {
+          const key = encSec(section.name);
+          html += `<div class="add-form">
+            <input id="add-input-${key}" class="add-input" placeholder="输入任务内容…"
+              onkeydown="if(event.key==='Enter')confirmAdd('${esc(section.name)}');if(event.key==='Escape')cancelAdd()">
+            <button class="btn-confirm" onclick="confirmAdd('${esc(section.name)}')">确认</button>
+            <button class="btn-cancel-add" onclick="cancelAdd()">取消</button>
+          </div>`;
+        }
+
+        html += `</div>`;
       }
 
       app.innerHTML = html;
