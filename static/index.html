@@ -227,7 +227,8 @@
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     // ── 渲染 ─────────────────────────────────────────────────────
@@ -286,7 +287,8 @@
             html += `<li class="task-item editing">
               <div class="checkbox${task.done ? ' checked' : ''}">${task.done ? '✓' : ''}</div>
               <input id="edit-input-${task.id}" class="task-edit-input" value="${esc(task.text)}"
-                onkeydown="if(event.key==='Enter')saveEdit('${task.id}');if(event.key==='Escape')cancelEdit()">
+                onkeydown="if(event.key==='Enter')saveEdit('${task.id}');if(event.key==='Escape')cancelEdit()"
+                onblur="saveEdit('${task.id}')">
               <div class="task-actions">
                 <button class="btn-icon save" onclick="saveEdit('${task.id}')" title="保存">✓</button>
                 <button class="btn-icon cancel" onclick="cancelEdit()" title="取消">✕</button>
