@@ -331,7 +331,7 @@ def test_startup_triggers_morning_review(monkeypatch):
 
     with patch("main.morning_review_job", new_callable=AsyncMock), \
          patch("main.scheduler"), \
-         patch("asyncio.create_task", side_effect=fake_create_task):
+         patch("main.asyncio.create_task", side_effect=fake_create_task):
         from main import app
         from fastapi.testclient import TestClient
         with TestClient(app):

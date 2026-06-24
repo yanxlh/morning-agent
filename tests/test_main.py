@@ -39,5 +39,5 @@ def test_trigger_review_http_endpoint(monkeypatch):
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
         # startup lifespan now also calls morning_review_job once via asyncio.create_task,
-        # so call_count is 2 (startup + HTTP trigger). Verify it was called at least once.
-        assert mock_job.call_count >= 1
+        # so call_count is 2 (startup + HTTP trigger). Verify it was called exactly twice.
+        assert mock_job.call_count == 2
