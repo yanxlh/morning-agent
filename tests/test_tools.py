@@ -53,3 +53,98 @@ def test_create_tomorrow_template_no_overwrite(tmp_path, monkeypatch):
     result = tools.create_tomorrow_template.invoke({})
     assert "已经存在" in result
     assert existing.read_text(encoding="utf-8") == "已有内容"
+
+
+# ── Task 1 新增测试 ──────────────────────────────────────────────
+
+def test_create_schedule_creates_two_sections(tmp_path):
+    import tools
+    tools.create_schedule("2026-06-24", schedule_dir=tmp_path)
+    content = (tmp_path / "2026-06-24.md").read_text(encoding="utf-8")
+    assert "## 固定日程" in content
+    assert "## 灵活待办" in content
+
+
+def test_create_schedule_no_overwrite(tmp_path):
+    import tools
+    (tmp_path / "2026-06-24.md").write_text("原有内容", encoding="utf-8")
+    tools.create_schedule("2026-06-24", schedule_dir=tmp_path)
+    assert (tmp_path / "2026-06-24.md").read_text(encoding="utf-8") == "原有内容"
+
+
+def test_append_task_adds_to_section(tmp_path):
+    import tools
+    (tmp_path / "2026-06-24.md").write_text(
+        "## 固定日程\n- [ ] 已有任务\n\n## 灵活待办\n",
+        encoding="utf-8",
+    )
+    tools.append_task("2026-06-24", "固定日程", "新任务", schedule_dir=tmp_path)
+    content = (tmp_path / "2026-06-24.md").read_text(encoding="utf-8")
+    assert "- [ ] 新任务" in content
+    lines = content.splitlines()
+    # 新任务应在固定日程 section 内（灵活待办之前）
+    new_idx = next(i for i, l in enumerate(lines) if "新任务" in l)
+    flex_idx = next(i for i, l in enumerate(lines) if "灵活待办" in l)
+    assert new_idx < flex_idx
+
+
+def test_append_task_to_empty_section(tmp_path):
+    import tools
+    (tmp_path / "2026-06-24.md").write_text(
+        "## 固定日程\n\n## 灵活待办\n",
+        encoding="utf-8",
+    )
+    tools.append_task("2026-06-24", "固定日程", "第一个任务", schedule_dir=tmp_path)
+    content = (tmp_path / "2026-06-24.md").read_text(encoding="utf-8")
+    assert "- [ ] 第一个任务" in content
+
+
+def test_append_task_missing_file_raises(tmp_path):
+    import tools, pytest
+    with pytest.raises(FileNotFoundError):
+        tools.append_task("2099-01-01", "固定日程", "任务", schedule_dir=tmp_path)
+
+
+def test_append_task_missing_section_raises(tmp_path):
+    import tools, pytest
+    (tmp_path / "2026-06-24.md").write_text("## 固定日程\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        tools.append_task("2026-06-24", "不存在的section", "任务", schedule_dir=tmp_path)
+
+
+def test_delete_task_removes_line(tmp_path):
+    import tools
+    (tmp_path / "2026-06-24.md").write_text(
+        "## 灵活待办\n- [ ] 任务A\n- [x] 任务B\n",
+        encoding="utf-8",
+    )
+    tools.delete_task("2026-06-24", "s0-t0", schedule_dir=tmp_path)
+    content = (tmp_path / "2026-06-24.md").read_text(encoding="utf-8")
+    assert "任务A" not in content
+    assert "任务B" in content
+
+
+def test_delete_task_not_found_raises(tmp_path):
+    import tools, pytest
+    (tmp_path / "2026-06-24.md").write_text("## 灵活待办\n- [ ] 只有一个\n", encoding="utf-8")
+    with pytest.raises(LookupError):
+        tools.delete_task("2026-06-24", "s0-t5", schedule_dir=tmp_path)
+
+
+def test_update_task_text_changes_text_keeps_done(tmp_path):
+    import tools
+    (tmp_path / "2026-06-24.md").write_text(
+        "## 灵活待办\n- [x] 旧文字\n",
+        encoding="utf-8",
+    )
+    tools.update_task_text("2026-06-24", "s0-t0", "新文字", schedule_dir=tmp_path)
+    content = (tmp_path / "2026-06-24.md").read_text(encoding="utf-8")
+    assert "- [x] 新文字" in content
+    assert "旧文字" not in content
+
+
+def test_update_task_text_not_found_raises(tmp_path):
+    import tools, pytest
+    (tmp_path / "2026-06-24.md").write_text("## 灵活待办\n- [ ] 任务\n", encoding="utf-8")
+    with pytest.raises(LookupError):
+        tools.update_task_text("2026-06-24", "s0-t9", "新文字", schedule_dir=tmp_path)
