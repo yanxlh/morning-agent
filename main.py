@@ -297,17 +297,114 @@ async def reschedule_today():
     return {"scheduled": count}
 
 
+def _direct_assign_flexible_times(date_str: str, schedule_dir=None) -> int:
+    """
+    Algorithmically assign time slots to untimed flexible tasks.
+    Reads fixed-schedule time ranges, finds free gaps, and writes HH:MM-HH:MM
+    prefixes back to the file. Returns the number of tasks updated.
+    """
+    import re as _re
+
+    sched_dir = Path(schedule_dir) if schedule_dir else _DEFAULT_SCHEDULE_DIR
+    filepath = sched_dir / f"{date_str}.md"
+    if not filepath.exists():
+        return 0
+
+    TIME_RE = _re.compile(r"^(\d{2}:\d{2})-(\d{2}:\d{2})\s+")
+    lines = filepath.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    # Collect occupied intervals from fixed-schedule tasks that have times
+    occupied: list[tuple[int, int]] = []
+    in_fixed = False
+    for line in lines:
+        s = line.rstrip("\n")
+        if s.startswith("## "):
+            in_fixed = s[3:].strip() == "固定日程"
+            continue
+        if not in_fixed or not line.startswith("- "):
+            continue
+        raw = line[2:].strip()
+        text = raw[4:] if raw[:4] in ("[ ] ", "[x] ") else raw
+        m = TIME_RE.match(text)
+        if m:
+            sh, sm = map(int, m.group(1).split(":"))
+            eh, em = map(int, m.group(2).split(":"))
+            occupied.append((sh * 60 + sm, eh * 60 + em))
+
+    occupied.sort()
+
+    # Collect untimed flexible task lines
+    flex_lines: list[tuple[int, str, str]] = []   # (line_idx, text, orig_raw)
+    in_flex = False
+    for i, line in enumerate(lines):
+        s = line.rstrip("\n")
+        if s.startswith("## "):
+            in_flex = s[3:].strip() == "灵活待办"
+            continue
+        if not in_flex or not line.startswith("- "):
+            continue
+        raw = line[2:].strip()
+        if raw[:4] in ("[ ] ", "[x] "):
+            text = raw[4:]
+        elif raw and raw != "-":
+            text = raw
+        else:
+            continue
+        if not TIME_RE.match(text):
+            flex_lines.append((i, text, raw))
+
+    if not flex_lines:
+        return 0
+
+    # Build free slots within working hours (09:00–22:00)
+    DAY_START, DAY_END, TASK_DUR, GAP = 9 * 60, 22 * 60, 90, 15
+    blocked = sorted(
+        (max(s, DAY_START), min(e, DAY_END))
+        for s, e in occupied if s < DAY_END and e > DAY_START
+    )
+    free: list[tuple[int, int]] = []
+    cursor = DAY_START
+    for s, e in blocked:
+        if s > cursor:
+            free.append((cursor, s))
+        cursor = max(cursor, e)
+    if cursor < DAY_END:
+        free.append((cursor, DAY_END))
+
+    if not free:
+        free = [(DAY_START, DAY_END)]
+
+    slot_i, slot_cursor = 0, free[0][0]
+    updated = 0
+
+    for line_i, text, orig_raw in flex_lines:
+        # Advance to a slot with enough room
+        while slot_i < len(free) and free[slot_i][1] - slot_cursor < TASK_DUR:
+            slot_i += 1
+            if slot_i < len(free):
+                slot_cursor = free[slot_i][0]
+        if slot_i >= len(free):
+            break
+
+        s_str = f"{slot_cursor // 60:02d}:{slot_cursor % 60:02d}"
+        e_str = f"{(slot_cursor + TASK_DUR) // 60:02d}:{(slot_cursor + TASK_DUR) % 60:02d}"
+        marker = "[x] " if orig_raw.startswith("[x] ") else "[ ] "
+        lines[line_i] = f"- {marker}{s_str}-{e_str} {text}\n"
+        slot_cursor += TASK_DUR + GAP
+        updated += 1
+
+    if updated:
+        filepath.write_text("".join(lines), encoding="utf-8")
+    return updated
+
+
 @app.post("/api/schedule/{date_str}/assign-times")
 async def assign_schedule_times(date_str: str):
     if date_str != _date.today().isoformat():
         raise HTTPException(status_code=400, detail="Can only assign times for today")
     try:
-        await agent.ainvoke({
-            "messages": [{
-                "role": "user",
-                "content": "请读取今天的日程表，分析固定日程之间的空隙，调用 assign_flexible_times 工具为灵活待办安排合理的时间段。只做时间分配，不要创建明日模板，不要发送通知。",
-            }]
-        })
+        count = _direct_assign_flexible_times(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+        print(f"assign_schedule_times: 分配了 {count} 个任务")
     except Exception as e:
         print(f"assign_schedule_times 失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -423,22 +423,23 @@ def test_assign_times_rejects_past_date():
 
 
 def test_assign_times_today(tmp_path):
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import patch
     from fastapi.testclient import TestClient
 
     today = _date.today().isoformat()
     (tmp_path / f"{today}.md").write_text(
-        "## 灵活待办\n- [ ] 剪视频\n",
+        "## 固定日程\n- [ ] 10:00-11:00 会议\n\n## 灵活待办\n- [ ] 剪视频\n- [ ] 学习rust\n",
         encoding="utf-8",
     )
 
     with patch("main._DEFAULT_SCHEDULE_DIR", tmp_path), \
-         patch("main.scheduler"), \
-         patch("main.agent") as mock_agent:
-        mock_agent.ainvoke = AsyncMock(return_value={"messages": [MagicMock(content="已安排")]})
+         patch("main.scheduler"):
         from main import app
         with TestClient(app) as client:
             resp = client.post(f"/api/schedule/{today}/assign-times")
 
     assert resp.status_code == 200
-    assert resp.json()["date"] == today
+    data = resp.json()
+    assert data["date"] == today
+    flex_tasks = [t for s in data["sections"] if s["name"] == "灵活待办" for t in s["tasks"]]
+    assert all(":" in t["text"][:5] for t in flex_tasks), "每个灵活任务应有时间前缀"
