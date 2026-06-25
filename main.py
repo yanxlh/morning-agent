@@ -19,6 +19,8 @@ from tools import (
     delete_task,
     update_task_text,
 )
+from config import get_config, save_config
+from reminder import reschedule_reminders, sse_generator
 
 
 def parse_schedule(date_str: str, schedule_dir: Optional[Path] = None) -> dict:
@@ -131,6 +133,17 @@ async def morning_review_job() -> None:
     except Exception as e:
         print(f"morning_review_job 执行失败: {e}")
 
+    try:
+        cfg = get_config()
+        reschedule_reminders(
+            _date.today().isoformat(),
+            scheduler,
+            cfg["advance_minutes"],
+            schedule_dir=_DEFAULT_SCHEDULE_DIR,
+        )
+    except Exception as e:
+        print(f"提醒调度失败: {e}")
+
 
 def job_error_listener(event):
     print(f"定时任务异常: {event.exception}")
@@ -234,3 +247,51 @@ async def remove_task(date_str: str, task_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)
+
+
+# ── 设置与提醒端点 ────────────────────────────────────────────
+
+
+@app.get("/api/settings")
+async def get_settings():
+    return get_config()
+
+
+class _SettingsUpdate(BaseModel):
+    advance_minutes: int
+
+
+@app.post("/api/settings")
+async def update_settings(body: _SettingsUpdate):
+    if body.advance_minutes < 0:
+        raise HTTPException(status_code=400, detail="advance_minutes must be >= 0")
+    save_config({"advance_minutes": body.advance_minutes})
+    reschedule_reminders(
+        _date.today().isoformat(),
+        scheduler,
+        body.advance_minutes,
+        schedule_dir=_DEFAULT_SCHEDULE_DIR,
+    )
+    return get_config()
+
+
+@app.get("/api/events")
+async def sse_endpoint():
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        sse_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/reminders/reschedule")
+async def reschedule_today():
+    cfg = get_config()
+    count = reschedule_reminders(
+        _date.today().isoformat(),
+        scheduler,
+        cfg["advance_minutes"],
+        schedule_dir=_DEFAULT_SCHEDULE_DIR,
+    )
+    return {"scheduled": count}

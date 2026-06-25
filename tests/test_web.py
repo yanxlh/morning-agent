@@ -338,3 +338,63 @@ def test_startup_triggers_morning_review(monkeypatch):
             pass
 
     assert len(created) == 1
+
+
+# ── Task 4 新增测试 ──────────────────────────────────────────────
+
+def test_get_settings_api():
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    with patch("main.scheduler"), \
+         patch("main.get_config", return_value={"advance_minutes": 15}):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.get("/api/settings")
+
+    assert resp.status_code == 200
+    assert resp.json()["advance_minutes"] == 15
+
+
+def test_post_settings_api():
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    with patch("main.scheduler"), \
+         patch("main.save_config") as mock_save, \
+         patch("main.reschedule_reminders") as mock_resched, \
+         patch("main.get_config", return_value={"advance_minutes": 20}):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.post("/api/settings", json={"advance_minutes": 20})
+
+    assert resp.status_code == 200
+    mock_save.assert_called_once_with({"advance_minutes": 20})
+    mock_resched.assert_called_once()
+
+
+def test_post_settings_rejects_negative():
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    with patch("main.scheduler"):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.post("/api/settings", json={"advance_minutes": -1})
+
+    assert resp.status_code == 400
+
+
+def test_reschedule_api():
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    with patch("main.scheduler"), \
+         patch("main.get_config", return_value={"advance_minutes": 15}), \
+         patch("main.reschedule_reminders", return_value=4):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.post("/api/reminders/reschedule")
+
+    assert resp.status_code == 200
+    assert resp.json()["scheduled"] == 4
