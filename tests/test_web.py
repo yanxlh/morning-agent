@@ -398,3 +398,13 @@ def test_reschedule_api():
 
     assert resp.status_code == 200
     assert resp.json()["scheduled"] == 4
+
+
+def test_sse_endpoint_registered():
+    from unittest.mock import patch
+
+    with patch("main.scheduler"):
+        from main import app
+
+    routes = {r.path: r for r in app.routes}
+    assert "/api/events" in routes

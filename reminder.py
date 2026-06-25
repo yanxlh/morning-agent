@@ -44,19 +44,22 @@ def parse_task_times(
 
 
 async def sse_generator():
-    """Server-Sent Events 异步生成器，每个连接独立队列。"""
+    """Async generator for Server-Sent Events. Yields formatted SSE data lines."""
     q: asyncio.Queue = asyncio.Queue()
     _sse_clients.append(q)
     try:
         while True:
-            event = await q.get()
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=30)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": heartbeat\n\n"
     finally:
         _sse_clients.remove(q)
 
 
 async def push_reminder_event(event: dict) -> None:
-    for q in _sse_clients:
+    for q in list(_sse_clients):
         await q.put(event)
 
 
