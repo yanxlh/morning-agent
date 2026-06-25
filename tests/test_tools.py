@@ -148,3 +148,69 @@ def test_update_task_text_not_found_raises(tmp_path):
     (tmp_path / "2026-06-24.md").write_text("## 灵活待办\n- [ ] 任务\n", encoding="utf-8")
     with pytest.raises(LookupError):
         tools.update_task_text("2026-06-24", "s0-t9", "新文字", schedule_dir=tmp_path)
+
+
+from datetime import date as _date
+
+
+def test_assign_flexible_times_adds_time_prefix(tmp_path, monkeypatch):
+    import tools
+    monkeypatch.setattr(tools, "SCHEDULE_DIR", tmp_path)
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text(
+        "## 固定日程\n- [ ] 14:00-15:00 健身\n\n## 灵活待办\n- [ ] 剪视频\n- [ ] 学习rust\n",
+        encoding="utf-8",
+    )
+    result = tools.assign_flexible_times.invoke(
+        {"assignments_json": '[{"index": 0, "start": "09:00", "end": "10:00"}]'}
+    )
+    content = (tmp_path / f"{today}.md").read_text(encoding="utf-8")
+    assert "09:00-10:00 剪视频" in content
+    assert "学习rust" in content  # index 1，未分配，不变
+    assert "已为 1" in result
+
+
+def test_assign_flexible_times_skips_existing_time(tmp_path, monkeypatch):
+    import tools
+    monkeypatch.setattr(tools, "SCHEDULE_DIR", tmp_path)
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text(
+        "## 灵活待办\n- [ ] 09:00-10:00 剪视频\n",
+        encoding="utf-8",
+    )
+    result = tools.assign_flexible_times.invoke(
+        {"assignments_json": '[{"index": 0, "start": "11:00", "end": "12:00"}]'}
+    )
+    content = (tmp_path / f"{today}.md").read_text(encoding="utf-8")
+    assert "09:00-10:00 剪视频" in content  # 未被覆盖
+    assert "11:00" not in content
+    assert "已为 0" in result
+
+
+def test_assign_flexible_times_invalid_json(tmp_path, monkeypatch):
+    import tools
+    monkeypatch.setattr(tools, "SCHEDULE_DIR", tmp_path)
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text("## 灵活待办\n- [ ] 任务\n", encoding="utf-8")
+    result = tools.assign_flexible_times.invoke({"assignments_json": "not json"})
+    assert "JSON 解析失败" in result
+
+
+def test_assign_flexible_times_out_of_bounds(tmp_path, monkeypatch):
+    import tools
+    monkeypatch.setattr(tools, "SCHEDULE_DIR", tmp_path)
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text("## 灵活待办\n- [ ] 任务\n", encoding="utf-8")
+    result = tools.assign_flexible_times.invoke(
+        {"assignments_json": '[{"index": 99, "start": "09:00", "end": "10:00"}]'}
+    )
+    assert "已为 0" in result
+
+
+def test_assign_flexible_times_no_file(tmp_path, monkeypatch):
+    import tools
+    monkeypatch.setattr(tools, "SCHEDULE_DIR", tmp_path)
+    result = tools.assign_flexible_times.invoke(
+        {"assignments_json": '[{"index": 0, "start": "09:00", "end": "10:00"}]'}
+    )
+    assert "日程文件不存在" in result

@@ -144,3 +144,71 @@ def update_task_text(date_str: str, task_id: str, text: str, schedule_dir: Optio
     marker = raw[:4] if raw.startswith("[x] ") or raw.startswith("[ ] ") else "[ ] "
     lines[idx] = f"- {marker}{text}\n"
     filepath.write_text("".join(lines), encoding="utf-8")
+
+
+@tool
+def assign_flexible_times(assignments_json: str) -> str:
+    """
+    为今天灵活待办中的任务分配时间段，写回日程文件。
+    assignments_json: JSON 数组，格式为
+    '[{"index": 0, "start": "09:00", "end": "10:00"}, ...]'
+    index 是灵活待办 section 中任务的序号（从0开始）。
+    已有时间前缀（HH:MM-HH:MM）的任务不覆盖。
+    返回成功写入的任务数量描述。
+    """
+    import json as _json
+    import re as _re
+    from datetime import date as _date
+
+    try:
+        assignments = _json.loads(assignments_json)
+    except _json.JSONDecodeError as e:
+        return f"JSON 解析失败: {e}"
+
+    today = _date.today().isoformat()
+    filepath = SCHEDULE_DIR / f"{today}.md"
+    if not filepath.exists():
+        return f"今日日程文件不存在: {today}"
+
+    lines = filepath.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    in_flex = False
+    flex_task_lines: list[tuple[int, str]] = []
+    for i, line in enumerate(lines):
+        stripped = line.rstrip("\n")
+        if stripped.startswith("## "):
+            if stripped[3:].strip() == "灵活待办":
+                in_flex = True
+            elif in_flex:
+                break
+        elif in_flex and line.startswith("- "):
+            raw = line[2:].strip()
+            if raw.startswith("[ ] ") or raw.startswith("[x] "):
+                text = raw[4:]
+            elif raw and raw != "-":
+                text = raw
+            else:
+                continue
+            flex_task_lines.append((i, text))
+
+    _time_prefix_re = _re.compile(r"^\d{2}:\d{2}-\d{2}:\d{2}\s")
+    updated = 0
+
+    for assignment in assignments:
+        idx = assignment.get("index", -1)
+        start = assignment.get("start", "")
+        end = assignment.get("end", "")
+        if not (isinstance(idx, int) and start and end):
+            continue
+        if idx < 0 or idx >= len(flex_task_lines):
+            continue
+        line_i, text = flex_task_lines[idx]
+        if _time_prefix_re.match(text):
+            continue
+        orig_raw = lines[line_i][2:].strip()
+        marker = "[x] " if orig_raw.startswith("[x] ") else "[ ] "
+        lines[line_i] = f"- {marker}{start}-{end} {text}\n"
+        updated += 1
+
+    filepath.write_text("".join(lines), encoding="utf-8")
+    return f"已为 {updated} 个灵活待办任务分配时间"
