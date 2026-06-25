@@ -3,328 +3,581 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>今日日程</title>
+  <title>我的日程</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f5; color: #333; padding: 24px;
-      max-width: 600px; margin: 0 auto;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
     }
-    .date-header { margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-    .date-header h1 { font-size: 1.4rem; color: #222; }
-    .date-picker {
-      padding: 4px 10px; border: 1px solid #ddd; border-radius: 8px;
-      font-size: 0.9rem; color: #555; background: white; cursor: pointer;
+
+    /* ── 顶部导航栏 ── */
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 0 20px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    .card {
-      background: white; border-radius: 12px; padding: 20px;
-      margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    .topbar-title { font-size: 1rem; font-weight: 600; color: #1a1a1a; }
+    .date-nav { display: flex; align-items: center; gap: 8px; }
+    .date-nav .nav-btn {
+      background: none;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      width: 28px; height: 28px;
+      cursor: pointer;
+      font-size: 1rem;
+      color: #666;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
-    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .card-title { font-size: 1rem; font-weight: 600; color: #333; }
-    .count-label { font-size: 0.85rem; color: #999; }
-    .bar-wrap { height: 10px; background: #ebebeb; border-radius: 5px; overflow: hidden; }
-    .bar-fill { height: 100%; border-radius: 5px; background: #5b8def; transition: width 0.3s ease; }
-    .bar-fill.complete { background: #52c47a; }
-    .done-msg { text-align: center; padding-top: 8px; font-size: 0.9rem; color: #52c47a; font-weight: 500; }
-    .section-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .section-title { font-size: 0.95rem; font-weight: 600; color: #444; }
-    .section-header-right { display: flex; align-items: center; gap: 12px; }
-    .mini-progress { display: flex; align-items: center; gap: 8px; }
-    .mini-bar { width: 72px; height: 6px; background: #ebebeb; border-radius: 3px; overflow: hidden; }
-    .mini-fill { height: 100%; border-radius: 3px; background: #5b8def; transition: width 0.3s ease; }
-    .mini-count { font-size: 0.78rem; color: #bbb; }
-    .btn-add-task {
-      background: none; border: 1px solid #5b8def; color: #5b8def;
-      border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 0.8rem;
+    .date-nav .nav-btn:hover { background: #f5f5f5; }
+    .date-display {
+      font-size: 0.9rem; color: #333; font-weight: 500;
+      min-width: 110px; text-align: center;
+      padding: 4px 10px;
+      border: 1px solid #e0e0e0; border-radius: 6px;
+      cursor: pointer; position: relative; user-select: none;
     }
-    .btn-add-task:hover { background: #f0f5ff; }
-    .task-list { list-style: none; }
-    .task-item {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 9px 6px; border-radius: 6px;
-      transition: background 0.1s; position: relative;
+    .date-display:hover { background: #f5f5f5; }
+    #date-picker {
+      position: absolute; inset: 0; opacity: 0;
+      cursor: pointer; width: 100%; border: none;
     }
-    .task-item:hover { background: #f7f7f7; }
-    .task-item + .task-item { border-top: 1px solid #f2f2f2; }
-    .task-item.clickable { cursor: pointer; }
-    .checkbox {
-      width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 4px;
-      flex-shrink: 0; margin-top: 1px; display: flex; align-items: center;
-      justify-content: center; transition: all 0.15s; font-size: 11px; color: white;
+
+    /* ── 主体 ── */
+    .main { max-width: 480px; margin: 0 auto; padding: 16px 16px 40px; }
+
+    /* ── 总进度卡片 ── */
+    .progress-card {
+      background: linear-gradient(135deg, #4f7cff 0%, #3a5fd9 100%);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      color: #fff;
     }
-    .checkbox.checked { background: #52c47a; border-color: #52c47a; }
-    .task-text { font-size: 0.9rem; line-height: 1.45; color: #333; flex: 1; }
-    .task-text.done { text-decoration: line-through; color: #bbb; }
-    .task-actions { display: none; margin-left: auto; gap: 2px; align-items: center; flex-shrink: 0; }
-    .task-item:hover .task-actions { display: flex; }
-    .task-item.editing .task-actions { display: flex; }
-    .btn-icon {
-      background: none; border: none; cursor: pointer;
-      padding: 3px 5px; border-radius: 4px; font-size: 0.85rem; color: #bbb;
-      line-height: 1;
+    .progress-card.all-done {
+      background: linear-gradient(135deg, #43c07a 0%, #2ea360 100%);
     }
-    .btn-icon.edit:hover { color: #5b8def; background: #f0f5ff; }
-    .btn-icon.delete:hover { color: #ff4d4f; background: #fff1f0; }
-    .btn-icon.save { color: #52c47a; }
-    .btn-icon.save:hover { background: #f6ffed; }
-    .btn-icon.cancel:hover { color: #999; background: #f5f5f5; }
+    .progress-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    .progress-label { font-size: 0.78rem; opacity: 0.8; margin-bottom: 4px; }
+    .progress-count { font-size: 1.6rem; font-weight: 700; }
+    .progress-count span { font-size: 1rem; font-weight: 400; opacity: 0.7; }
+    .progress-sub { font-size: 0.78rem; opacity: 0.7; margin-top: 2px; }
+    .progress-pct { font-size: 2rem; font-weight: 700; }
+    .progress-bar-bg {
+      height: 6px; background: rgba(255,255,255,0.3);
+      border-radius: 3px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: #fff;
+      border-radius: 3px; transition: width 0.4s ease;
+    }
+
+    /* ── Section 卡片 ── */
+    .section-card {
+      background: #fff; border-radius: 14px;
+      margin-bottom: 12px; overflow: hidden;
+    }
+    .section-head {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .section-name {
+      font-size: 0.78rem; font-weight: 600;
+      color: #aaa; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .section-meta { display: flex; align-items: center; gap: 10px; }
+    .section-count { font-size: 0.78rem; color: #ccc; }
+    .btn-add {
+      background: #f0f4ff; border: none; border-radius: 6px;
+      color: #4f7cff; font-size: 0.8rem; font-weight: 500;
+      padding: 3px 10px; cursor: pointer;
+    }
+    .btn-add:hover { background: #e4ecff; }
+
+    /* ── 任务行 ── */
+    .task-list { padding: 4px 0; list-style: none; }
+    .task-row {
+      display: flex; align-items: center;
+      padding: 10px 16px; gap: 12px;
+      transition: background 0.1s;
+    }
+    .task-row.clickable { cursor: pointer; }
+    .task-row:hover { background: #fafafa; }
+    .task-row + .task-row { border-top: 1px solid #f7f7f7; }
+
+    .check {
+      width: 20px; height: 20px;
+      border: 2px solid #d5d5d5; border-radius: 50%;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .check.done {
+      background: #52c47a; border-color: #52c47a;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .check.done::after {
+      content: '';
+      width: 5px; height: 9px;
+      border: 2px solid #fff;
+      border-top: none; border-left: none;
+      transform: rotate(45deg) translateY(-1px);
+      display: block;
+    }
+
+    .task-text { flex: 1; font-size: 0.92rem; color: #2a2a2a; line-height: 1.45; }
+    .task-text.done { text-decoration: line-through; color: #c0c0c0; }
+
+    .task-actions { display: none; gap: 2px; flex-shrink: 0; }
+    .task-row:hover .task-actions,
+    .task-row.editing .task-actions { display: flex; }
+
+    .act-btn {
+      width: 26px; height: 26px; border: none; border-radius: 6px;
+      background: transparent; cursor: pointer;
+      font-size: 0.85rem; display: flex; align-items: center;
+      justify-content: center; color: #ccc;
+    }
+    .act-btn:hover { background: #f0f0f0; color: #666; }
+    .act-btn.del:hover { background: #fff1f0; color: #ff4d4f; }
+    .act-btn.save { color: #52c47a; }
+    .act-btn.save:hover { background: #f6ffed; color: #52c47a; }
+
+    /* ── 编辑输入框 ── */
     .task-edit-input {
-      flex: 1; border: 1px solid #5b8def; border-radius: 4px;
-      padding: 2px 6px; font-size: 0.9rem; outline: none; min-width: 0;
+      flex: 1; border: 1px solid #4f7cff; border-radius: 6px;
+      padding: 3px 8px; font-size: 0.92rem; outline: none; min-width: 0;
+      color: #2a2a2a;
     }
+
+    /* ── 添加表单 ── */
     .add-form {
-      display: flex; gap: 8px; padding: 10px 6px 4px;
-      border-top: 1px solid #f2f2f2; align-items: center;
+      display: flex; gap: 8px;
+      padding: 10px 16px 14px;
+      border-top: 1px solid #f5f5f5;
     }
     .add-input {
-      flex: 1; border: 1px solid #ddd; border-radius: 6px;
-      padding: 6px 10px; font-size: 0.9rem; outline: none; min-width: 0;
+      flex: 1; border: 1px solid #e0e0e0; border-radius: 8px;
+      padding: 7px 12px; font-size: 0.9rem; outline: none;
+      color: #333; transition: border-color 0.15s; min-width: 0;
     }
-    .add-input:focus { border-color: #5b8def; }
-    .btn-confirm {
-      background: #5b8def; color: white; border: none;
-      border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem; white-space: nowrap;
+    .add-input:focus { border-color: #4f7cff; }
+    .add-input::placeholder { color: #ccc; }
+    .btn-ok {
+      background: #4f7cff; color: #fff; border: none;
+      border-radius: 8px; padding: 7px 14px;
+      font-size: 0.85rem; cursor: pointer; white-space: nowrap;
     }
+    .btn-ok:hover { background: #3a5fd9; }
     .btn-cancel-add {
-      background: none; border: 1px solid #ddd; border-radius: 6px;
-      padding: 6px 10px; cursor: pointer; font-size: 0.85rem; color: #999; white-space: nowrap;
+      background: none; border: 1px solid #e0e0e0; border-radius: 8px;
+      padding: 7px 10px; cursor: pointer; font-size: 0.85rem;
+      color: #999; white-space: nowrap;
     }
-    .empty { text-align: center; color: #ccc; padding: 48px 20px; font-size: 0.9rem; line-height: 1.7; }
-    .create-btn {
-      background: #5b8def; color: white; border: none; border-radius: 8px;
-      padding: 10px 24px; cursor: pointer; font-size: 0.95rem; margin-top: 16px;
+
+    /* ── 空状态 ── */
+    .empty-state {
+      text-align: center; padding: 70px 20px;
     }
-    .create-btn:hover { background: #4a7de0; }
+    .empty-icon { font-size: 2.8rem; margin-bottom: 12px; }
+    .empty-text { color: #bbb; font-size: 0.9rem; margin-bottom: 24px; line-height: 1.6; }
+    .btn-create {
+      background: #4f7cff; color: #fff; border: none;
+      border-radius: 10px; padding: 11px 32px;
+      font-size: 0.95rem; cursor: pointer;
+    }
+    .btn-create:hover { background: #3a5fd9; }
+
+    /* ── 设置面板 ── */
+    .topbar-right { display: flex; align-items: center; gap: 8px; position: relative; }
+    .settings-btn {
+      background: none; border: 1px solid #e0e0e0; border-radius: 6px;
+      width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center; color: #888;
+    }
+    .settings-btn:hover { background: #f5f5f5; }
+    .settings-panel {
+      display: none; position: absolute; top: 40px; right: 0;
+      background: #fff; border: 1px solid #eee; border-radius: 12px;
+      padding: 14px 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      z-index: 100; min-width: 220px;
+    }
+    .settings-panel.open { display: block; }
+    .settings-title {
+      font-size: 0.78rem; color: #aaa; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px;
+    }
+    .settings-row { display: flex; align-items: center; gap: 8px; }
+    .settings-label { font-size: 0.85rem; color: #555; white-space: nowrap; }
+    .settings-input {
+      width: 54px; border: 1px solid #e0e0e0; border-radius: 6px;
+      padding: 4px 8px; font-size: 0.85rem; text-align: center; outline: none;
+    }
+    .settings-input:focus { border-color: #4f7cff; }
+    .settings-save {
+      background: #4f7cff; color: #fff; border: none; border-radius: 6px;
+      padding: 5px 12px; font-size: 0.82rem; cursor: pointer;
+    }
+    .settings-save:hover { background: #3a5fd9; }
+    .settings-ok { font-size: 0.78rem; color: #52c47a; margin-top: 8px; display: none; }
   </style>
 </head>
 <body>
-  <div class="date-header">
-    <h1 id="date-title">—</h1>
-    <input type="date" id="date-picker" class="date-picker">
+
+<div class="topbar">
+  <span class="topbar-title">我的日程</span>
+  <div class="topbar-right">
+    <div class="date-nav">
+      <button class="nav-btn" onclick="changeDay(-1)">‹</button>
+      <span class="date-display">
+        <span id="date-label">—</span>
+        <input type="date" id="date-picker">
+      </span>
+      <button class="nav-btn" onclick="changeDay(1)">›</button>
+    </div>
+    <button class="settings-btn" onclick="toggleSettings()" title="设置">⚙</button>
+    <div class="settings-panel" id="settings-panel">
+      <div class="settings-title">设置</div>
+      <div class="settings-row">
+        <span class="settings-label">提前提醒</span>
+        <input type="number" id="advance-input" class="settings-input" min="0" max="120" value="15">
+        <span class="settings-label">分钟</span>
+        <button class="settings-save" onclick="saveSettings()">保存</button>
+      </div>
+      <div class="settings-ok" id="settings-ok">已保存 ✓</div>
+    </div>
   </div>
-  <div id="app"><div class="empty">加载中…</div></div>
+</div>
 
-  <script>
-    const WEEKDAYS = ['周日','周一','周二','周三','周四','周五','周六'];
-    let _data = null;
-    let _currentDate = new Date().toISOString().slice(0, 10);
-    let _editing = null;      // {taskId}
-    let _addingSection = null; // section name
+<div class="main">
+  <div id="app"></div>
+</div>
 
-    // ── 初始化 ──────────────────────────────────────────────────
+<script>
+  const WEEKDAYS = ['周日','周一','周二','周三','周四','周五','周六'];
+  const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 
-    const picker = document.getElementById('date-picker');
+  let _data = null;
+  function todayISO() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  let _currentDate = todayISO();
+  let _editing = null;
+  let _addingSection = null;
+
+  // ── 初始化日期选择器 ──────────────────────────────────────────
+
+  const picker = document.getElementById('date-picker');
+  picker.value = _currentDate;
+  picker.addEventListener('change', e => {
+    _currentDate = e.target.value;
+    _editing = null;
+    _addingSection = null;
+    updateDateLabel();
+    load();
+  });
+
+  function updateDateLabel() {
+    const d = new Date(_currentDate + 'T12:00:00');
+    document.getElementById('date-label').textContent =
+      MONTHS[d.getMonth()] + d.getDate() + '日 ' + WEEKDAYS[d.getDay()];
+  }
+
+  function changeDay(delta) {
+    const d = new Date(_currentDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    _currentDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     picker.value = _currentDate;
-    picker.addEventListener('change', e => {
-      _currentDate = e.target.value;
-      _editing = null;
-      _addingSection = null;
-      load();
+    _editing = null;
+    _addingSection = null;
+    updateDateLabel();
+    load();
+  }
+
+  // ── 数据加载 ─────────────────────────────────────────────────
+
+  async function load() {
+    const res = await fetch('/api/schedule/' + _currentDate);
+    _data = await res.json();
+    render(_data);
+  }
+
+  // ── 操作函数 ─────────────────────────────────────────────────
+
+  async function createSchedule() {
+    await fetch('/api/schedule/' + _currentDate, { method: 'POST' });
+    load();
+  }
+
+  async function toggle(taskId, currentDone) {
+    const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done: !currentDone }),
     });
+    if (!res.ok) return;
+    _data = await res.json();
+    render(_data);
+  }
 
-    // ── 数据加载 ─────────────────────────────────────────────────
-
-    async function load() {
-      const res = await fetch('/api/schedule/' + _currentDate);
-      _data = await res.json();
-      render(_data);
-    }
-
-    // ── 操作函数 ─────────────────────────────────────────────────
-
-    async function createSchedule() {
-      await fetch('/api/schedule/' + _currentDate, { method: 'POST' });
-      load();
-    }
-
-    async function toggle(taskId, currentDone) {
-      const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ done: !currentDone }),
-      });
-      if (!res.ok) return;
-      _data = await res.json();
-      render(_data);
-    }
-
-    function startEdit(taskId) {
-      _editing = { taskId };
-      _addingSection = null;
-      render(_data);
-      setTimeout(() => {
-        const el = document.getElementById('edit-input-' + taskId);
-        if (el) { el.focus(); el.select(); }
-      }, 30);
-    }
-
-    function cancelEdit() {
-      _editing = null;
-      render(_data);
-    }
-
-    async function saveEdit(taskId) {
+  function startEdit(taskId) {
+    _editing = { taskId };
+    _addingSection = null;
+    render(_data);
+    setTimeout(() => {
       const el = document.getElementById('edit-input-' + taskId);
-      const text = el ? el.value.trim() : '';
-      if (!text) { cancelEdit(); return; }
-      const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) return;
-      _data = await res.json();
-      _editing = null;
-      render(_data);
-    }
+      if (el) { el.focus(); el.select(); }
+    }, 30);
+  }
 
-    async function deleteTask(taskId) {
-      const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
-        method: 'DELETE',
-      });
-      if (!res.ok) return;
-      _data = await res.json();
-      render(_data);
-    }
+  function cancelEdit() {
+    _editing = null;
+    render(_data);
+  }
 
-    function showAddForm(sectionName) {
-      _addingSection = sectionName;
-      _editing = null;
-      render(_data);
-      setTimeout(() => {
-        const el = document.getElementById('add-input-' + encSec(sectionName));
-        if (el) el.focus();
-      }, 30);
-    }
+  async function saveEdit(taskId) {
+    if (!_editing || _editing.taskId !== taskId) return;
+    const el = document.getElementById('edit-input-' + taskId);
+    const text = el ? el.value.trim() : '';
+    if (!text) { cancelEdit(); return; }
+    _editing = null; // 先清除防止 onblur 重复触发
+    const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return;
+    _data = await res.json();
+    render(_data);
+  }
 
-    function cancelAdd() {
-      _addingSection = null;
-      render(_data);
-    }
+  async function deleteTask(taskId) {
+    const res = await fetch('/api/schedule/' + _currentDate + '/task/' + taskId, {
+      method: 'DELETE',
+    });
+    if (!res.ok) return;
+    _data = await res.json();
+    render(_data);
+  }
 
-    async function confirmAdd(sectionName) {
+  function showAddForm(sectionName) {
+    _addingSection = sectionName;
+    _editing = null;
+    render(_data);
+    setTimeout(() => {
       const el = document.getElementById('add-input-' + encSec(sectionName));
-      const text = el ? el.value.trim() : '';
-      if (!text) { cancelAdd(); return; }
-      const res = await fetch('/api/schedule/' + _currentDate + '/task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section: sectionName, text }),
-      });
-      if (!res.ok) return;
-      _data = await res.json();
-      _addingSection = null;
-      render(_data);
-    }
+      if (el) el.focus();
+    }, 30);
+  }
 
-    function encSec(name) { return name.replace(/\s+/g, '_'); }
+  function cancelAdd() {
+    _addingSection = null;
+    render(_data);
+  }
 
-    function esc(s) {
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
+  async function confirmAdd(sectionName) {
+    const el = document.getElementById('add-input-' + encSec(sectionName));
+    const text = el ? el.value.trim() : '';
+    if (!text) { cancelAdd(); return; }
+    const res = await fetch('/api/schedule/' + _currentDate + '/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section: sectionName, text }),
+    });
+    if (!res.ok) return;
+    _data = await res.json();
+    _addingSection = null;
+    render(_data);
+  }
 
-    // ── 渲染 ─────────────────────────────────────────────────────
+  function encSec(name) { return name.replace(/\s+/g, '_'); }
 
-    function bar(pct, extra) {
-      return `<div class="bar-wrap"><div class="bar-fill ${extra}" style="width:${pct}%"></div></div>`;
-    }
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
-    function render(data) {
-      const d = new Date(data.date + 'T12:00:00');
-      document.getElementById('date-title').textContent = data.date + ' ' + WEEKDAYS[d.getDay()];
+  // ── 渲染 ─────────────────────────────────────────────────────
 
-      const app = document.getElementById('app');
+  function render(data) {
+    const app = document.getElementById('app');
 
-      if (!data.sections || data.sections.length === 0) {
-        app.innerHTML = `<div class="empty">这天还没有日程文件<br>
-          <button class="create-btn" onclick="createSchedule()">创建日程</button>
+    if (!data.sections || data.sections.length === 0) {
+      app.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-text">这天还没有日程<br>点击下方按钮创建</div>
+          <button class="btn-create" onclick="createSchedule()">创建日程</button>
         </div>`;
-        return;
-      }
+      return;
+    }
 
-      const pct = data.total > 0 ? Math.round(data.done_count / data.total * 100) : 0;
-      const allDone = data.total > 0 && data.done_count === data.total;
+    const pct = data.total > 0 ? Math.round(data.done_count / data.total * 100) : 0;
+    const allDone = data.total > 0 && data.done_count === data.total;
+    const remaining = data.total - data.done_count;
 
-      let html = `<div class="card">
-        <div class="card-header">
-          <span class="card-title">今日进度</span>
-          <span class="count-label">${data.done_count} / ${data.total} 完成</span>
+    let html = `
+      <div class="progress-card${allDone ? ' all-done' : ''}">
+        <div class="progress-card-top">
+          <div>
+            <div class="progress-label">${allDone ? '全部完成 🎉' : '今日完成'}</div>
+            <div class="progress-count">${data.done_count} <span>/ ${data.total}</span></div>
+            <div class="progress-sub">${allDone ? '今天的事都做完了' : '还剩 ' + remaining + ' 项待完成'}</div>
+          </div>
+          <div class="progress-pct">${pct}%</div>
         </div>
-        ${bar(pct, allDone ? 'complete' : '')}
-        ${allDone ? '<div class="done-msg">今天的事都做完了 🎉</div>' : ''}
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width:${pct}%"></div>
+        </div>
       </div>`;
 
-      for (const section of data.sections) {
-        const st = section.tasks.length;
-        const sd = section.tasks.filter(t => t.done).length;
-        const sp = st > 0 ? Math.round(sd / st * 100) : 0;
+    for (const section of data.sections) {
+      const st = section.tasks.length;
+      const sd = section.tasks.filter(t => t.done).length;
 
-        html += `<div class="section-card">
-          <div class="section-header">
-            <span class="section-title">${esc(section.name)}</span>
-            <div class="section-header-right">
-              <div class="mini-progress">
-                <div class="mini-bar"><div class="mini-fill" style="width:${sp}%"></div></div>
-                <span class="mini-count">${sd}/${st}</span>
-              </div>
-              <button class="btn-add-task" onclick="showAddForm('${esc(section.name)}')">+ 添加</button>
+      html += `
+        <div class="section-card">
+          <div class="section-head">
+            <span class="section-name">${esc(section.name)}</span>
+            <div class="section-meta">
+              <span class="section-count">${sd}/${st}</span>
+              <button class="btn-add" onclick="showAddForm('${esc(section.name)}')">＋ 添加</button>
             </div>
           </div>
           <ul class="task-list">`;
 
-        for (const task of section.tasks) {
-          const isEditing = _editing && _editing.taskId === task.id;
+      for (const task of section.tasks) {
+        const isEditing = _editing && _editing.taskId === task.id;
 
-          if (isEditing) {
-            html += `<li class="task-item editing">
-              <div class="checkbox${task.done ? ' checked' : ''}">${task.done ? '✓' : ''}</div>
+        if (isEditing) {
+          html += `
+            <li class="task-row editing">
+              <div class="check${task.done ? ' done' : ''}"></div>
               <input id="edit-input-${task.id}" class="task-edit-input" value="${esc(task.text)}"
                 onkeydown="if(event.key==='Enter')saveEdit('${task.id}');if(event.key==='Escape')cancelEdit()"
                 onblur="saveEdit('${task.id}')">
               <div class="task-actions">
-                <button class="btn-icon save" onclick="saveEdit('${task.id}')" title="保存">✓</button>
-                <button class="btn-icon cancel" onclick="cancelEdit()" title="取消">✕</button>
+                <button class="act-btn save" onmousedown="event.preventDefault()" onclick="saveEdit('${task.id}')" title="保存">✓</button>
+                <button class="act-btn" onmousedown="event.preventDefault()" onclick="cancelEdit()" title="取消">✕</button>
               </div>
             </li>`;
-          } else {
-            html += `<li class="task-item clickable" onclick="toggle('${task.id}',${task.done})">
-              <div class="checkbox${task.done ? ' checked' : ''}">${task.done ? '✓' : ''}</div>
+        } else {
+          html += `
+            <li class="task-row clickable" onclick="toggle('${task.id}',${task.done})">
+              <div class="check${task.done ? ' done' : ''}"></div>
               <span class="task-text${task.done ? ' done' : ''}">${esc(task.text)}</span>
               <div class="task-actions">
-                <button class="btn-icon edit" onclick="event.stopPropagation();startEdit('${task.id}')" title="编辑">✎</button>
-                <button class="btn-icon delete" onclick="event.stopPropagation();deleteTask('${task.id}')" title="删除">×</button>
+                <button class="act-btn" onclick="event.stopPropagation();startEdit('${task.id}')" title="编辑">✎</button>
+                <button class="act-btn del" onclick="event.stopPropagation();deleteTask('${task.id}')" title="删除">×</button>
               </div>
             </li>`;
-          }
         }
-
-        html += `</ul>`;
-
-        if (_addingSection === section.name) {
-          const key = encSec(section.name);
-          html += `<div class="add-form">
-            <input id="add-input-${key}" class="add-input" placeholder="输入任务内容…"
-              onkeydown="if(event.key==='Enter')confirmAdd('${esc(section.name)}');if(event.key==='Escape')cancelAdd()">
-            <button class="btn-confirm" onclick="confirmAdd('${esc(section.name)}')">确认</button>
-            <button class="btn-cancel-add" onclick="cancelAdd()">取消</button>
-          </div>`;
-        }
-
-        html += `</div>`;
       }
 
-      app.innerHTML = html;
+      html += `</ul>`;
+
+      if (_addingSection === section.name) {
+        const key = encSec(section.name);
+        html += `
+          <div class="add-form">
+            <input id="add-input-${key}" class="add-input" placeholder="输入任务内容，回车确认…"
+              onkeydown="if(event.key==='Enter')confirmAdd('${esc(section.name)}');if(event.key==='Escape')cancelAdd()">
+            <button class="btn-ok" onclick="confirmAdd('${esc(section.name)}')">确认</button>
+            <button class="btn-cancel-add" onclick="cancelAdd()">取消</button>
+          </div>`;
+      }
+
+      html += `</div>`;
     }
 
-    load();
-  </script>
+    app.innerHTML = html;
+  }
+
+  // ── 设置面板 ──────────────────────────────────────────────────
+  function toggleSettings() {
+    const panel = document.getElementById('settings-panel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) loadSettings();
+  }
+
+  document.addEventListener('click', e => {
+    const panel = document.getElementById('settings-panel');
+    if (!panel.classList.contains('open')) return;
+    if (!panel.contains(e.target) && !e.target.closest('.settings-btn')) {
+      panel.classList.remove('open');
+    }
+  });
+
+  async function loadSettings() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('advance-input').value = data.advance_minutes;
+  }
+
+  async function saveSettings() {
+    const minutes = parseInt(document.getElementById('advance-input').value, 10);
+    if (isNaN(minutes) || minutes < 0) return;
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ advance_minutes: minutes }),
+    });
+    if (!res.ok) return;
+    const ok = document.getElementById('settings-ok');
+    ok.style.display = 'block';
+    setTimeout(() => { ok.style.display = 'none'; }, 2000);
+  }
+
+  // ── 浏览器通知 ────────────────────────────────────────────────
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
+  function showNotification(ev) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const title = ev.early
+      ? `⏰ ${ev.task} 还有 ${ev.advance_minutes} 分钟`
+      : `🔔 ${ev.task} 开始了`;
+    new Notification(title, { body: `安排时间：${ev.time}` });
+  }
+
+  // ── SSE 客户端 ────────────────────────────────────────────────
+  const _es = new EventSource('/api/events');
+  _es.onmessage = e => {
+    try {
+      const ev = JSON.parse(e.data);
+      if (ev.type === 'reminder') showNotification(ev);
+    } catch (_) {}
+  };
+
+  // 初始化
+  updateDateLabel();
+  load();
+</script>
 </body>
 </html>
