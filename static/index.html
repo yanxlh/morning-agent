@@ -141,8 +141,15 @@
       display: block;
     }
 
-    .task-text { flex: 1; font-size: 0.92rem; color: #2a2a2a; line-height: 1.45; }
+    .task-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .task-time-badge {
+      display: inline-block; font-size: 0.72rem; color: #4f7cff;
+      background: #f0f4ff; padding: 1px 7px; border-radius: 4px;
+      letter-spacing: 0.02em; width: fit-content;
+    }
+    .task-text { font-size: 0.92rem; color: #2a2a2a; line-height: 1.45; }
     .task-text.done { text-decoration: line-through; color: #c0c0c0; }
+    .task-time-badge.done { background: #f5f5f5; color: #ccc; }
 
     .task-actions { display: none; gap: 2px; flex-shrink: 0; }
     .task-row:hover .task-actions,
@@ -550,6 +557,11 @@
 
   function encSec(name) { return name.replace(/\s+/g, '_'); }
 
+  function parseTaskText(text) {
+    const m = text.match(/^(\d{2}:\d{2}-\d{2}:\d{2})\s+(.+)$/);
+    return m ? { time: m[1], name: m[2] } : { time: null, name: text };
+  }
+
   function esc(s) {
     return String(s)
       .replace(/&/g, '&amp;')
@@ -611,6 +623,7 @@
       for (const task of section.tasks) {
         const isEditing = _editing && _editing.taskId === task.id;
 
+        const parsed = parseTaskText(task.text);
         if (isEditing) {
           html += `
             <li class="task-row editing">
@@ -624,10 +637,15 @@
               </div>
             </li>`;
         } else {
+          const timeBadge = parsed.time
+            ? `<span class="task-time-badge${task.done ? ' done' : ''}">${esc(parsed.time)}</span>` : '';
           html += `
             <li class="task-row clickable" onclick="toggle('${task.id}',${task.done})">
               <div class="check${task.done ? ' done' : ''}"></div>
-              <span class="task-text${task.done ? ' done' : ''}">${esc(task.text)}</span>
+              <div class="task-body">
+                ${timeBadge}
+                <span class="task-text${task.done ? ' done' : ''}">${esc(parsed.name)}</span>
+              </div>
               <div class="task-actions">
                 <button class="act-btn" onclick="event.stopPropagation();startEdit('${task.id}')" title="编辑">✎</button>
                 <button class="act-btn del" onclick="event.stopPropagation();deleteTask('${task.id}')" title="删除">×</button>
