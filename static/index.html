@@ -400,9 +400,13 @@
       showAssigning(true);
       _assigning = true;
       try {
-        await fetch('/api/schedule/' + _currentDate + '/assign-times', { method: 'POST' });
-        const res2 = await fetch('/api/schedule/' + _currentDate);
-        _data = await res2.json();
+        const assignRes = await fetch('/api/schedule/' + _currentDate + '/assign-times', { method: 'POST' });
+        if (assignRes.ok) {
+          _data = await assignRes.json();
+        } else {
+          const res2 = await fetch('/api/schedule/' + _currentDate + '?_t=' + Date.now());
+          _data = await res2.json();
+        }
       } catch (_) {}
       _assigning = false;
       showAssigning(false);
@@ -690,6 +694,24 @@
       const next = Math.min(Math.max(cur + (e.deltaY > 0 ? 1 : -1), 0), _PICK_VALS.length - 1);
       el.scrollTo({ top: next * 40, behavior: 'smooth' });
     };
+    let _dragY = null, _dragTop = null;
+    el.onmousedown = (e) => {
+      _dragY = e.clientY; _dragTop = el.scrollTop;
+      el.style.cursor = 'grabbing'; e.preventDefault();
+    };
+    el.onmousemove = (e) => {
+      if (_dragY === null) return;
+      el.scrollTop = _dragTop - (e.clientY - _dragY);
+    };
+    const snapPicker = () => {
+      if (_dragY === null) return;
+      _dragY = null;
+      const idx = Math.min(Math.max(Math.round(el.scrollTop / 40), 0), _PICK_VALS.length - 1);
+      el.scrollTo({ top: idx * 40, behavior: 'smooth' });
+      el.style.cursor = '';
+    };
+    el.onmouseup = snapPicker;
+    el.onmouseleave = snapPicker;
     setTimeout(() => {
       const idx = _PICK_VALS.indexOf(_pickerValue);
       if (idx >= 0) el.scrollTop = idx * 40;
