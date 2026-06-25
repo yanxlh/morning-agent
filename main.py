@@ -295,3 +295,20 @@ async def reschedule_today():
         schedule_dir=_DEFAULT_SCHEDULE_DIR,
     )
     return {"scheduled": count}
+
+
+@app.post("/api/schedule/{date_str}/assign-times")
+async def assign_schedule_times(date_str: str):
+    if date_str != _date.today().isoformat():
+        raise HTTPException(status_code=400, detail="Can only assign times for today")
+    try:
+        await agent.ainvoke({
+            "messages": [{
+                "role": "user",
+                "content": "请读取今天的日程表，分析固定日程之间的空隙，调用 assign_flexible_times 工具为灵活待办安排合理的时间段。只做时间分配，不要创建明日模板，不要发送通知。",
+            }]
+        })
+    except Exception as e:
+        print(f"assign_schedule_times 失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    return parse_schedule(date_str, schedule_dir=_DEFAULT_SCHEDULE_DIR)

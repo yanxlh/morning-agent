@@ -236,6 +236,41 @@
     }
     .settings-save:hover { background: #3a5fd9; }
     .settings-ok { font-size: 0.78rem; color: #52c47a; margin-top: 8px; display: none; }
+
+    /* ── 自动分配提示 ── */
+    .assigning-banner {
+      background: #f0f4ff; color: #4f7cff; font-size: 0.82rem;
+      padding: 8px 14px; border-radius: 10px; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* ── 设置滚轮选择器 ── */
+    .picker-label { font-size: 0.78rem; color: #aaa; margin-bottom: 6px; text-align: center; }
+    .picker-wrap {
+      position: relative; width: 100%; height: 120px;
+      overflow: hidden; border-radius: 10px; background: #f8f9fb;
+    }
+    .picker-scroll {
+      height: 120px; overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .picker-scroll::-webkit-scrollbar { display: none; }
+    .picker-pad { height: 40px; }
+    .picker-opt {
+      height: 40px; display: flex; align-items: center; justify-content: center;
+      scroll-snap-align: start;
+      font-size: 0.88rem; color: #ccc; user-select: none;
+      transition: color 0.1s;
+    }
+    .picker-opt.active { color: #1a1a1a; font-weight: 600; font-size: 1rem; }
+    .picker-overlay {
+      position: absolute; top: 40px; left: 8px; right: 8px; height: 40px;
+      background: rgba(79,124,255,0.08);
+      border-top: 1.5px solid rgba(79,124,255,0.3);
+      border-bottom: 1.5px solid rgba(79,124,255,0.3);
+      border-radius: 6px; pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -254,12 +289,15 @@
     <button class="settings-btn" onclick="toggleSettings()" title="设置">⚙</button>
     <div class="settings-panel" id="settings-panel">
       <div class="settings-title">设置</div>
-      <div class="settings-row">
-        <span class="settings-label">提前提醒</span>
-        <input type="number" id="advance-input" class="settings-input" min="0" max="120" value="15">
-        <span class="settings-label">分钟</span>
-        <button class="settings-save" onclick="saveSettings()">保存</button>
+      <div class="picker-label">提前提醒（分钟）</div>
+      <div class="picker-wrap">
+        <div class="picker-scroll" id="advance-picker">
+          <div class="picker-pad"></div>
+          <div class="picker-pad"></div>
+        </div>
+        <div class="picker-overlay"></div>
       </div>
+      <button class="settings-save" onclick="saveSettings()" style="width:100%;margin-top:10px;">保存</button>
       <div class="settings-ok" id="settings-ok">已保存 ✓</div>
     </div>
   </div>
@@ -316,10 +354,53 @@
 
   // ── 数据加载 ─────────────────────────────────────────────────
 
+  const _TIME_PREFIX_RE = /^\d{2}:\d{2}-\d{2}:\d{2}\s/;
+
+  function needsTimeAssignment(data) {
+    for (const section of (data.sections || [])) {
+      if (section.name === '灵活待办') {
+        for (const task of section.tasks) {
+          if (!_TIME_PREFIX_RE.test(task.text)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  let _assigning = false;
+
   async function load() {
     const res = await fetch('/api/schedule/' + _currentDate);
     _data = await res.json();
+    if (_currentDate === todayISO() && !_assigning && needsTimeAssignment(_data) && (_data.sections || []).length > 0) {
+      render(_data);
+      showAssigning(true);
+      _assigning = true;
+      try {
+        await fetch('/api/schedule/' + _currentDate + '/assign-times', { method: 'POST' });
+        const res2 = await fetch('/api/schedule/' + _currentDate);
+        _data = await res2.json();
+      } catch (_) {}
+      _assigning = false;
+      showAssigning(false);
+    }
     render(_data);
+  }
+
+  function showAssigning(on) {
+    const app = document.getElementById('app');
+    let banner = document.getElementById('assign-banner');
+    if (on) {
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'assign-banner';
+        banner.className = 'assigning-banner';
+        banner.textContent = '⏳ AI 正在为灵活待办安排时间…';
+        app.prepend(banner);
+      }
+    } else {
+      if (banner) banner.remove();
+    }
   }
 
   // ── 操作函数 ─────────────────────────────────────────────────
@@ -518,6 +599,47 @@
   }
 
   // ── 设置面板 ──────────────────────────────────────────────────
+  const _PICK_VALS = [0, 5, 10, 15, 20, 30, 45, 60];
+  let _pickerValue = 15;
+
+  function buildPicker() {
+    const el = document.getElementById('advance-picker');
+    if (!el) return;
+    el.querySelectorAll('.picker-opt').forEach(d => d.remove());
+    const pad2 = el.querySelectorAll('.picker-pad')[1];
+    _PICK_VALS.forEach(v => {
+      const d = document.createElement('div');
+      d.className = 'picker-opt';
+      d.textContent = v + ' 分钟';
+      d.dataset.val = v;
+      el.insertBefore(d, pad2);
+    });
+    el.removeEventListener('scroll', onPickerScroll);
+    el.addEventListener('scroll', onPickerScroll);
+    setTimeout(() => {
+      const idx = _PICK_VALS.indexOf(_pickerValue);
+      if (idx >= 0) el.scrollTop = idx * 40;
+      updatePickerActive();
+    }, 0);
+  }
+
+  function onPickerScroll() {
+    const el = document.getElementById('advance-picker');
+    const idx = Math.min(Math.max(Math.round(el.scrollTop / 40), 0), _PICK_VALS.length - 1);
+    const val = _PICK_VALS[idx];
+    if (val !== _pickerValue) {
+      _pickerValue = val;
+      updatePickerActive();
+    }
+  }
+
+  function updatePickerActive() {
+    const el = document.getElementById('advance-picker');
+    if (!el) return;
+    const idx = _PICK_VALS.indexOf(_pickerValue);
+    el.querySelectorAll('.picker-opt').forEach((d, i) => d.classList.toggle('active', i === idx));
+  }
+
   function toggleSettings() {
     const panel = document.getElementById('settings-panel');
     panel.classList.toggle('open');
@@ -536,21 +658,20 @@
     const res = await fetch('/api/settings');
     if (!res.ok) return;
     const data = await res.json();
-    document.getElementById('advance-input').value = data.advance_minutes;
+    _pickerValue = data.advance_minutes;
+    buildPicker();
   }
 
   async function saveSettings() {
-    const minutes = parseInt(document.getElementById('advance-input').value, 10);
-    if (isNaN(minutes) || minutes < 0) return;
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ advance_minutes: minutes }),
+      body: JSON.stringify({ advance_minutes: _pickerValue }),
     });
     if (!res.ok) return;
     const ok = document.getElementById('settings-ok');
     ok.style.display = 'block';
-    setTimeout(() => { ok.style.display = 'none'; }, 2000);
+    setTimeout(() => { ok.style.display = 'none'; document.getElementById('settings-panel').classList.remove('open'); }, 1500);
   }
 
   // ── 浏览器通知 ────────────────────────────────────────────────

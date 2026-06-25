@@ -408,3 +408,37 @@ def test_sse_endpoint_registered():
 
     routes = {r.path: r for r in app.routes}
     assert "/api/events" in routes
+
+
+def test_assign_times_rejects_past_date():
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+
+    with patch("main.scheduler"):
+        from main import app
+        with TestClient(app) as client:
+            resp = client.post("/api/schedule/2020-01-01/assign-times")
+
+    assert resp.status_code == 400
+
+
+def test_assign_times_today(tmp_path):
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from fastapi.testclient import TestClient
+
+    today = _date.today().isoformat()
+    (tmp_path / f"{today}.md").write_text(
+        "## 灵活待办\n- [ ] 剪视频\n",
+        encoding="utf-8",
+    )
+
+    with patch("main._DEFAULT_SCHEDULE_DIR", tmp_path), \
+         patch("main.scheduler"), \
+         patch("main.agent") as mock_agent:
+        mock_agent.ainvoke = AsyncMock(return_value={"messages": [MagicMock(content="已安排")]})
+        from main import app
+        with TestClient(app) as client:
+            resp = client.post(f"/api/schedule/{today}/assign-times")
+
+    assert resp.status_code == 200
+    assert resp.json()["date"] == today
